@@ -2,7 +2,7 @@
  * @Author: Antoine YANG 
  * @Date: 2019-11-15 21:47:38 
  * @Last Modified by: Kanata You
- * @Last Modified time: 2020-10-19 19:02:32
+ * @Last Modified time: 2020-10-21 09:39:59
  */
 
 const express = require('express');
@@ -11,6 +11,7 @@ const fs = require("fs");
 const process = require('child_process');
 const bodyParser = require('body-parser');
 const axios = require('axios');
+
 
 app.use(bodyParser.json({limit: '50mb'}));
 app.use(bodyParser.urlencoded({limit: '50mb', extended: true}));
@@ -23,19 +24,37 @@ const decodePath = path => {
 
 app.get("/geojson/:adcode", (req, res) => {
     res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Referer", "url");
+    // res.setHeader("Referer", "url");
     const adcode = decodePath(req.params["adcode"]);
-    
-    axios.get(`./public/geojson/china/china_${ adcode }.json`).then(
-        prmsRes => {
-            res.json(prmsRes.data);
-        }
-    ).catch(
-        err => {
-            console.error(err);
-            res.json(err);
-        }
-    );
+
+    try {
+        res.json(JSON.parse(
+            fs.readFileSync(`./public/geojson/china/china_${ adcode }.json`)
+        ));
+    } catch {
+        axios.get(`https://geo.datav.aliyun.com/areas_v2/bound/${ adcode }.json`).then(
+            prmsRes => {
+                const nodes = prmsRes.data.features.map(feature => {
+                    return {
+                        adcode: parseInt(feature.properties.adcode),
+                        name: feature.properties.name,
+                        level: feature.properties.level,
+                        geometry: feature.geometry
+                    };
+                });
+
+                fs.writeFileSync(
+                    `./public/geojson/china/china_${ adcode }.json`, JSON.stringify(nodes)
+                );
+
+                res.json(nodes);
+            }
+        ).catch(
+            err => {
+                console.error(`Error occurred when getting adcode ${ adcode }: `, err);
+            }
+        );
+    }
 });
 
 

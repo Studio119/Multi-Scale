@@ -2,7 +2,7 @@
  * @Author: Kanata You 
  * @Date: 2020-09-23 11:49:47 
  * @Last Modified by: Kanata You
- * @Last Modified time: 2020-10-19 19:33:51
+ * @Last Modified time: 2020-10-21 09:53:18
  */
 
 import axios from "axios";
@@ -11,7 +11,7 @@ import axios from "axios";
 export type geojsonData = {
     adcode: number;
     name: string | null;
-    level: "province" | "distinct";
+    level: "province" | "district";
     geometry: geometry<"MultiPolygon">;
     children: Array<number>;
 };

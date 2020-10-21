@@ -2,7 +2,7 @@
  * @Author: Antoine YANG 
  * @Date: 2020-08-20 22:43:10 
  * @Last Modified by: Kanata You
- * @Last Modified time: 2020-10-19 19:37:15
+ * @Last Modified time: 2020-10-21 10:30:37
  */
 
 import React, { Component } from "react";
@@ -18,7 +18,13 @@ import { findOne } from "../Tools/YArray";
 
 
 const colorize = (val: number) => {
-    return Color.toRgb(`hsl(${ 120 + Math.floor(Math.pow(val, 0.7) * 240) },1,0.5)`)
+    // return Color.interpolate(
+    //     "rgb()",
+    //     "rgb()",
+    //     val
+    // )
+    return Color.toRgb(`hsl(${ 120 + Math.floor(Math.pow(val, 0.7) * 240) },1,0.5)`);
+    // return "rgb(208,139,0)";
 };
 
 export interface MapProps {
@@ -29,12 +35,12 @@ export interface MapProps {
 
 export interface MapState {
     data: Array<statistics>;
-    paths: Array<geojsonData>;
 };
 
 export class Map extends Component<MapProps, MapState, {}> {
 
     protected map: React.RefObject<MapBox>;
+    protected paths: Array<geojsonData>;
 
     protected canvasScatter: React.RefObject<HTMLCanvasElement>;
     protected ctxScatter: CanvasRenderingContext2D | null;
@@ -45,9 +51,10 @@ export class Map extends Component<MapProps, MapState, {}> {
     public constructor(props: MapProps) {
         super(props);
         this.state = {
-            data: [],
-            paths: []
+            data: []
         };
+
+        this.paths = [];
 
         this.repaint = debounced(this.repaint.bind(this));
 
@@ -199,9 +206,14 @@ export class Map extends Component<MapProps, MapState, {}> {
     }
 
     public add(geojson: Array<geojsonData>): void {
-        this.setState({
-            paths: this.state.paths.concat(geojson)
-        });
+        this.paths = this.paths.concat(geojson);
+
+        if (this.map.current) {
+            if (!this.map.current!.ready()) {
+                return;
+            }
+            geojson.forEach(path => this.paintPath(path));
+        }
     }
 
     public componentWillUnmount(): void {
@@ -220,33 +232,34 @@ export class Map extends Component<MapProps, MapState, {}> {
         this.timers = [];
     }
 
-    protected paintPath(data: statistics): void {
-        this.ctxScatter!.fillStyle = colorize(data.value);
-        (window as any)['a'] = () => console.log(this.state.paths);
-        const path = findOne(this.state.paths, path => (
-            path.adcode === data.id || path.name === data.name
-        ));
-        if (path) {
-            path.geometry.coordinates[0].forEach(cors => {
-                this.ctxScatter!.beginPath();
-                cors.forEach((cor, i) => {
-                    const pos = this.map.current!.project({
-                        lng: cor[0],
-                        lat: cor[1]
-                    });
-
-                    if (i) {
-                        this.ctxScatter!.lineTo(pos.x, pos.y);
-                    } else {
-                        this.ctxScatter!.moveTo(pos.x, pos.y);
-                    }
-                });
-                this.ctxScatter!.globalAlpha = 0.2;
-                this.ctxScatter!.fill();
-                this.ctxScatter!.closePath();
-                this.ctxScatter!.globalAlpha = 1;
-            });
+    protected paintPath(path: geojsonData): void {
+        const data = findOne(this.state.data, d => d.id === path.adcode || d.name === path.name);
+        if (!data) {
+            this.ctxScatter!.fillStyle = "rgb(62,62,62)";
+            return;
+        } else {
+            this.ctxScatter!.fillStyle = colorize(data.value);
         }
+        this.ctxScatter!.fillStyle = colorize(Math.random());
+        path.geometry.coordinates[0].forEach(cors => {
+            this.ctxScatter!.beginPath();
+            cors.forEach((cor, i) => {
+                const pos = this.map.current!.project({
+                    lng: cor[0],
+                    lat: cor[1]
+                });
+
+                if (i) {
+                    this.ctxScatter!.lineTo(pos.x, pos.y);
+                } else {
+                    this.ctxScatter!.moveTo(pos.x, pos.y);
+                }
+            });
+            this.ctxScatter!.fill();
+            this.ctxScatter!.stroke();
+            this.ctxScatter!.closePath();
+            this.ctxScatter!.globalAlpha = 1;
+        });
     }
     
     /**
@@ -266,10 +279,10 @@ export class Map extends Component<MapProps, MapState, {}> {
                 return;
             }
             // TODO: 绘制
-            this.state.data.forEach((d, i) => {
+            this.paths.forEach((path, i) => {
                 this.timers.push(
                     setTimeout(() => {
-                        this.paintPath(d);
+                        this.paintPath(path);
                     }, i + 1)
                 );
             });
